@@ -7,8 +7,10 @@ my $width = shift || 1024;
 my $height = shift || 1024;
 my $max = shift || 4096;
 my $start = shift || 0x0;
+my $dc_offset = 500000;
 
-my $threshold = 300000;
+my $threshold = -300000 + $dc_offset;
+my $threshold_count_min = 8;
 
 my $data = do { local $/; <> };
 my $data_offset = 0x400 + $start * 3; # 0x400;
@@ -32,26 +34,32 @@ while($x < $width)
 	my $val = $b2 << 16 | $b1 << 8 | $b0 << 0;
 	$val -= (1 << 24) if $val & (1 << 23);
 
+	$val += $dc_offset;
+
 	my $blue = $val < 0 ? -$val / $max : 0;
+	#my $green = $val > 0 ? ($val*$val)/$max/(1<<20) : 0;
 	my $green = $val > 0 ? $val / $max : 0;
 	my $red = 0;
 
-	if ($val < 0)
+	$blue = 255 if $blue > 255;
+	if ($green > 255)
 	{
-		# count how many exceed some threshold to determine if
-		# a boundary has been sent
-		if ($val < -$threshold and $y > 200)
+		# yellow is off scale green
+		$green = 255;
+		$red = 255;
+	}
+
+	# count how many exceed some threshold to determine if
+	# a boundary has been sent
+	if ($val < $threshold and $y > 300)
+	{
+		if ($boundary_count++ > $threshold_count_min)
 		{
-			if ($boundary_count++ > 4)
-			{
-				$x++;
-				$y = 0;
-				$boundary_count = 0;
-			}
-			$red = 255;
-		} else {
+			$x++;
+			$y = 0;
 			$boundary_count = 0;
 		}
+		$red = 255;
 	} else {
 		$boundary_count = 0;
 	}

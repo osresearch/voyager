@@ -7,6 +7,8 @@ my $width = shift || 1024;
 my $height = shift || 1024;
 my $max = shift || 4096;
 my $start = shift || 0x0;
+my $dc_offset = shift || 0;
+my $alpha = 0;
 
 my $data = do { local $/; <> };
 my $data_offset = 0x400 + $start * 3; # 0x400;
@@ -15,6 +17,7 @@ my $len = length($data);
 my $gd = GD::Image->new($width,$height,1);
 
 warn "Read $len bytes\n";
+my $old_val = 0;
 
 for(my $i = 0 ; $i < $width * $height ; $i++)
 {
@@ -27,6 +30,13 @@ for(my $i = 0 ; $i < $width * $height ; $i++)
 	my $b2 = ord(substr($data, $offset + 2, 1));
 	my $val = $b2 << 16 | $b1 << 8 | $b0 << 0;
 	$val -= (1 << 24) if $val & (1 << 23);
+
+	$val += $dc_offset;
+
+	# apply some agc
+	$val = ($val + $old_val * $alpha) / (1 + $alpha);
+	$old_val = $val;
+
 
 #	$val = -$val if $val < 0;
 #
